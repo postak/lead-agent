@@ -150,6 +150,8 @@ async def agent_to_twilio_messaging(
       call_sid,
   )
 
+  turn_num = 1
+
   try:
     while True:
       async for event in live_events:
@@ -178,9 +180,10 @@ async def agent_to_twilio_messaging(
           message = {
               "event": "mark",
               "streamSid": stream_sid,
-              "mark": {"name": "turn_complete"},
+              "mark": {"name": f"turn_{turn_num}complete"},
           }
           await websocket.send_text(json.dumps(message))
+          turn_num += 1
           continue
         if event.interrupted:
           message = {
@@ -292,6 +295,7 @@ async def twilio_to_agent_messaging(
         live_request_queue.send_realtime(
             types.Blob(data=pcm_audio, mime_type="audio/pcm")
         )
+        logging.info("TWILIO->AGENT: Sent user audio to live request queue.")
       elif event_type == "stop" or event_type == "closed":
         logging.info("TWILIO->AGENT: Twilio stream stopped.")
         live_request_queue.close()

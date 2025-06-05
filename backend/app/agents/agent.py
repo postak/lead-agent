@@ -5,8 +5,8 @@ from absl import logging
 
 from google.adk import agents
 
-from app.tools import lead_tools
-from app.tools import telephony_tools
+from app.tools.lead_tools import build_lead_quality_record
+from app.tools.telephony_tools import conclude_call
 
 
 _MODEL = "gemini-2.0-flash-exp"  # "gemini-2.0-flash-live-001"
@@ -37,9 +37,9 @@ root_agent = agents.Agent(
     model=_MODEL,
     instruction=load_prompt_from_file(),
     tools=[
-        lead_tools.build_lead_quality_record,
-        telephony_tools.conclude_call,
+        build_lead_quality_record,
+        conclude_call,
     ],
 )
 
-logging.info("AGENT: Declarative LlmAgent '%s' defined.", root_agent.name)
+logging.info("AGENT: Declarative Agent '%s' defined.", root_agent.name)
