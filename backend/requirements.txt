@@ -1,0 +1,16 @@
+twilio==9.6.2
+absl-py==2.1.0
+google-adk==1.1.1
+requests==2.32.3
+uvicorn==0.34.0
+google-auth==2.37.0
+fastapi==0.115.6
+google-api-core==2.24.0
+google-cloud-logging==3.11.3
+pydantic-settings==2.9.1
+pydantic[email]
+google-generativeai==0.8.5
+websockets==15.0.1
+python-dotenv==1.1.0
+audioop-lts==0.2.1
+Deprecated==1.2.18

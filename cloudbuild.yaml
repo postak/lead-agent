@@ -1,0 +1,18 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-backend'
+    args: [
+        'build',
+        '-t', '$_ARTIFACT_REGISTRY_REGION-docker.pkg.dev/$PROJECT_ID/$_ARTIFACT_REGISTRY_REPO/twilio_agent:latest',
+        '-f', 'Dockerfile',
+        '.'
+    ]
+    dir: 'backend'
+    waitFor: ['-']
+
+substitutions:
+  _ARTIFACT_REGISTRY_REGION: 'us-central1'
+  _ARTIFACT_REGISTRY_REPO: 'lead-agent'
+
+images:
+  - '$_ARTIFACT_REGISTRY_REGION-docker.pkg.dev/$PROJECT_ID/$_ARTIFACT_REGISTRY_REPO/twilio_agent:latest'
