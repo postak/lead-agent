@@ -16,40 +16,41 @@ A real-time, conversational AI voice agent designed to automate the lead qualifi
 The application follows an event-driven, streaming architecture.
 
 ```
-+--------------+      +-----------------+    
-| Website Form |----->|  1. HTTP POST   |
-|  (New Lead)  |      | (Initiate Call) |   
-+--------------+      +-----------------+
-                               |
-                               | 
-                               |    
-                       +-------v------+
-                       |  FastAPI App |
-                       | (Cloud Run)  |
-                       +--------------+
-                              |
-                              | 2. Twilio REST API Call
-                              |
-                         +----v----+
-                         |  Twilio |
-                         +---------+
-                              |
-                              | 3. Places Phone Call
-                              |
-                         +----v-----+
-                         | Customer |
-                         |  (Lead)  |
-                         +----+-----+
-                              |
++--------------+          +-----------------+    
+| Website Form |--------->|  1. HTTP POST   |
+|  (New Lead)  |          | (Initiate Call) |   
++--------------+          +--------+--------+
+                                   |
+                                   | 
+                                   |    
+                          +--------v--------+
+                          |    FastAPI App  |
+                          |   (Cloud Run)   |
+                          +--------+--------+
+                                   |
+                                   | 2. Twilio REST API Call
+                                   |
+                          +--------v--------+
+                          |      Twilio     |
+                          |                 |
+                          +-----------------+
+                                   |
+                                   | 3. Places Phone Call
+                                   |
+                          +--------v--------+
+                          |     Customer    |
+                          |      (Lead)     |
+                          +--------+--------+
+                                   |
             +--------------------------------------------+
             |         4. Twilio bidirectional            |
             |            WebSocket Media Stream          |
             v                                            ^
-+---------------------+                      +------------------------+      +--------------------+  
-| FastAPI Api         |<-------------------->| Agent Development Kit  |      | AI Platform        |
-| (WebSocket Endpoint |   5. Bidirectional   | (ADK Runner)           |<---->| (Gemini, STT, TTS) |
-| & Handlers)         |     Audio & Events   |                        |      |                    |
-+---------------------+                      +------------------------+      +--------------------+
++---------------------+                       +-------------------+     +---------------+  
+| FastAPI Api         |<--------------------->| Agent Development |     | AI Platform   |
+| (WebSocket Endpoint |   5. Bidirectional    | Kit (ADK Runner)  |<--->| (Gemini, STT, |
+| & Handlers)         |     Audio & Events    |                   |     |  TTS)         |
++---------------------+                       +-------------------+     +---------------+
 ```
 
 1.  **Initiation:** An HTTP POST request containing lead data is sent to `/api/calls/initiate`.
