@@ -6,7 +6,7 @@ class Settings(BaseSettings):
   model_config = SettingsConfigDict(
       env_file='./app/.env', env_file_encoding='utf-8'
   )
-
+  APP_NAME: str = "Lead Qualification Voice Agent"
   # LLM Provider
   GOOGLE_PROJECT_ID: str
   GOOGLE_LOCATION: str

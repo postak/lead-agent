@@ -1,12 +1,18 @@
 # app/services/telephony_service.py
 import json
 import base64
-from urllib.parse import urlencode
-from absl import logging
-from twilio.rest import Client
-from twilio.twiml.voice_response import Connect, VoiceResponse, Say, Stream, Pause
 
-from app.config import settings  # Your application settings
+from absl import logging
+
+from app.config import settings
+
+from twilio import rest
+from twilio.twiml import voice_response
+
+Client = rest.Client
+Connect = voice_response.Connect
+VoiceResponse = voice_response.VoiceResponse
+Stream = voice_response.Stream
 
 
 class TwilioTelephonyService:
@@ -28,18 +34,14 @@ class TwilioTelephonyService:
           "SERVICE_ERROR: Failed to initialize Twilio client: %s", e
       )
 
-  def initiate_call_with_stream(
-      self, to_phone_number: str, lead_id: str, lead_context: dict | None
-  ) -> str | None:
+  def initiate_call_with_stream(self, lead_info: dict | None) -> str | None:
     """Initiates an outbound call using Twilio.
 
     Instructs Twilio to connect a bidirectional media stream
     to a WebSocket endpoint.
 
     Args:
-        to_phone_number: The E.164 formatted phone number to call.
-        lead_id: A unique identifier for the lead/call session.
-        lead_context: A dictionary containing initial context for the agent.
+        lead_info: A dictionary containing initial context for the agent.
 
     Returns:
         The Call SID if the call was successfully initiated, None otherwise.
@@ -50,15 +52,22 @@ class TwilioTelephonyService:
       )
       return None
 
+    phone_number = lead_info.get("phone_number")
+    lead_id = lead_info.get("lead_id")
+    if not phone_number or not lead_id:
+      logging.error(
+          "SERVICE_ERROR: Phone number or lead_id missing in lead_info."
+      )
+      return None
+
     try:
-      lead_context_json = json.dumps(lead_context)
+      lead_context_json = json.dumps(lead_info)
       lead_context_b64 = base64.urlsafe_b64encode(
           lead_context_json.encode("utf-8")
       ).decode("utf-8")
 
-      query_params_dict = {"lead_id": lead_id, "lead_context": lead_context_b64}
       websocket_url = (
-          f"{settings.BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/ws/twilio_stream"
+          f"{settings.BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/api/ws/twilio_stream"
       )
 
       logging.info(
@@ -69,21 +78,20 @@ class TwilioTelephonyService:
       twiml_response = VoiceResponse()
       connect = Connect()
       stream = Stream(url=websocket_url)
-      for key, value in query_params_dict.items():
-        stream.parameter(name=key, value=value)
+      stream.parameter(name="lead_info", value=lead_context_b64)
       connect.append(stream)
       twiml_response.append(connect)
-      status_callback_url = f"{settings.BASE_URL}/api/v1/twilio_status_handler"
+      status_callback_url = f"{settings.BASE_URL}/api/twilio_status_handler"
 
       logging.info(
           "SERVICE: Initiating Twilio stream call to %s from %s for lead_id %s",
-          to_phone_number,
+          phone_number,
           settings.TWILIO_VIRTUAL_PHONE_NUMBER,
           lead_id,
       )
 
       call = self.client.calls.create(
-          to=to_phone_number,
+          to=phone_number,
           from_=settings.TWILIO_VIRTUAL_PHONE_NUMBER,
           twiml=twiml_response.to_xml(),
           status_callback=status_callback_url,
@@ -116,8 +124,8 @@ class TwilioTelephonyService:
       return None
 
   def end_call(self, call_sid: str) -> bool:
-    """
-    Terminates an active call using the Twilio REST API.
+    """Terminates an active call using the Twilio REST API.
+
     This can be called by your application logic if the agent decides to end the call.
     """
     if not self.client:

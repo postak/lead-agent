@@ -9,8 +9,11 @@ class LeadWebhookPayload(BaseModel):
   lead_id: str = Field(
       ..., description="Unique identifier for the lead from the source system."
   )
-  full_name: str = Field(
-      ..., description="The full name of the potential customer."
+  first_name: str = Field(
+      ..., description="The first name of the potential customer."
+  )
+  last_name: str = Field(
+      ..., description="The last name of the potential customer."
   )
   phone_number: str = Field(
       ..., description="The phone number to call for qualification."

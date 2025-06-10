@@ -28,6 +28,7 @@ def load_prompt_from_file() -> str:
     return "You are a helpful assistant."
 
 
+# Singleton instance to be used by other parts of the application.
 root_agent = agents.Agent(
     name="Alex",
     description=(
