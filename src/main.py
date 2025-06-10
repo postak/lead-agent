@@ -1,20 +1,13 @@
 """Main application for the Lead Qualification Voice Agent."""
 
 from absl import logging
-
 import dotenv
 import fastapi
-
-
-from app.api import calls
-from app.api import streams
-from app.config import settings
-from google.adk import runners
+from src.api import calls
+from src.api import streams
+from src.config import settings
 
 load_dotenv = dotenv.load_dotenv
-WebSocket = fastapi.WebSocket
-Response = fastapi.Response
-Request = fastapi.Request
 FastAPI = fastapi.FastAPI
 
 load_dotenv()

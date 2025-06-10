@@ -1,9 +1,9 @@
-# app/services/crm_service.py
 """Mocked CRM Service.
 
 In a real application, this would use the HubSpot/Salesforce client
 to fetch and update contact/lead data.
 """
+
 import time
 
 from absl import logging
@@ -12,7 +12,7 @@ from absl import logging
 class MockCRMService:
   """Mocks interactions with a CRM like HubSpot."""
 
-  def get_contact_history(self, email: str) -> dict:
+  def get_contact_history(self, email: str) -> dict[str, bool | str | None]:
     """Simulates checking if a contact exists and getting their history."""
     logging.info("CRM_SERVICE: Checking history for %s...", email)
     time.sleep(1)
@@ -26,7 +26,7 @@ class MockCRMService:
     return {"contact_exists": False, "notes": None}
 
   def update_lead_record(
-      self, lead_id: str, status: str, qualification_data: dict
+      self, lead_id: str, status: str, qualification_data: dict[str, str]
   ):
     """Simulates updating the lead record in the CRM."""
     logging.info(

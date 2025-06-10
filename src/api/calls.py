@@ -1,11 +1,14 @@
-# app/api/v1/twilio_status_handler.py (New File)
-from fastapi import APIRouter, Form, Response
+"""FastAPI router for handling call-related API endpoints."""
+
 from absl import logging
+import fastapi
+from src.schemas import lead as lead_lib
+from src.services import telephony_service as telephony_service_lib
 
-from app.schemas import lead
-from app.services import telephony_service as telephony_service_lib
-
-LeadWebhookPayload = lead.LeadWebhookPayload
+APIRouter = fastapi.APIRouter
+Form = fastapi.Form
+Response = fastapi.Response
+LeadWebhookPayload = lead_lib.LeadWebhookPayload
 telephony_service = telephony_service_lib.telephony_service
 
 
@@ -26,45 +29,47 @@ async def initiate_call_endpoint(payload: LeadWebhookPayload) -> Response:
 
 @router.post("/twilio_status_handler")
 async def handle_twilio_call_status(
-    CallSid: str = Form(...),
-    CallStatus: str = Form(...),
-    From: str = Form(None),
-    To: str = Form(None),
-    Direction: str = Form(None),
-    CallDuration: str = Form(None),
-    SipResponseCode: str = Form(None),
+    call_sid: str = Form(...),
+    call_status: str = Form(...),
+    from_: str = Form(None),
+    to: str = Form(None),
+    call_duration: str = Form(None),
+    sip_response_code: str = Form(None),
 ):
   """Receives call status updates from Twilio."""
   try:
     logging.info(
         "TWILIO_STATUS_CALLBACK: CallSid: %s, CallStatus: %s, From: %s, To: %s,"
         " Duration: %s",
-        CallSid,
-        CallStatus,
-        From,
-        To,
-        CallDuration,
+        call_sid,
+        call_status,
+        from_,
+        to,
+        call_duration,
     )
 
-    if CallStatus == "completed":
+    if call_status == "completed":
       logging.info(
-          "Call %s completed. Duration: %s seconds.", CallSid, CallDuration
+          "Call %s completed. Duration: %s seconds.", call_sid, call_duration
       )
       # TODO: Update database, trigger post-call analysis, notify CRM, etc.
-      # Example: await crm_service.log_call_completed(CallSid, CallDuration, From, To)
-    elif CallStatus == "failed":
+      # Example: await crm_service.log_call_completed(
+      #     call_sid, call_duration, from_, to
+      # )
+    elif call_status == "failed":
       logging.error(
-          "Call %s failed. SipResponseCode: %s", CallSid, SipResponseCode
+          "Call %s failed. SipResponseCode: %s", call_sid, sip_response_code
       )
       # TODO: Handle failed call, maybe retry logic or alert.
-    elif CallStatus == "no-answer":
-      logging.warning("Call %s was not answered.", CallSid)
+    elif call_status == "no-answer":
+      logging.warning("Call %s was not answered.", call_sid)
       # TODO: Update lead status to "No Answer".
-    elif CallStatus == "busy":
-      logging.warning("Call %s was busy.", CallSid)
+    elif call_status == "busy":
+      logging.warning("Call %s was busy.", call_sid)
       # TODO: Update lead status to "Busy".
-    # Add handling for other statuses like "ringing", "initiated", "canceled" if needed.
-  except Exception as e:
+      # Add handling for other statuses like "ringing", "initiated", "canceled"
+      # if needed.
+  except Exception as e:  # pylint: disable=broad-exception-caught
     logging.exception(
         "TWILIO STATUS HANDLER: Error handling call status: %s", e
     )

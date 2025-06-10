@@ -5,12 +5,12 @@ from fastapi import WebSocket
 
 from google.adk import runners
 
-from app.agents.agent import root_agent
-from app.config import settings
+from src.agents.lead_agent import root_agent
+from src.config import settings
 
 
-from app.handlers import twilio_stream_handler
-from app.services import telephony_service as telephony_service_lib
+from src.handlers import twilio_stream_handler
+from src.services import telephony_service as telephony_service_lib
 
 InMemoryRunner = runners.InMemoryRunner
 telephony_service = telephony_service_lib.telephony_service

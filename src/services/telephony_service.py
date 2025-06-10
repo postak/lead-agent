@@ -1,12 +1,12 @@
-# app/services/telephony_service.py
-import json
+"""This module provides a Twilio telephony service."""
+
 import base64
+import json
 
 from absl import logging
-
-from app.config import settings
-
+from src.config import settings
 from twilio import rest
+from twilio.base.exceptions import TwilioException
 from twilio.twiml import voice_response
 
 Client = rest.Client
@@ -28,13 +28,13 @@ class TwilioTelephonyService:
           settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN
       )
       logging.info("SERVICE: Twilio client initialized successfully.")
-    except Exception as e:
+    except TwilioException as e:
       self.client = None
       logging.critical(
           "SERVICE_ERROR: Failed to initialize Twilio client: %s", e
       )
 
-  def initiate_call_with_stream(self, lead_info: dict | None) -> str | None:
+  def initiate_call_with_stream(self, lead_info: dict[str, str]) -> str | None:
     """Initiates an outbound call using Twilio.
 
     Instructs Twilio to connect a bidirectional media stream
@@ -114,7 +114,7 @@ class TwilioTelephonyService:
       )
       return call.sid
 
-    except Exception as e:
+    except TwilioException as e:
       logging.error(
           "SERVICE_ERROR: Failed to initiate Twilio stream call for lead_id"
           " %s: %s",
@@ -126,7 +126,11 @@ class TwilioTelephonyService:
   def end_call(self, call_sid: str) -> bool:
     """Terminates an active call using the Twilio REST API.
 
-    This can be called by your application logic if the agent decides to end the call.
+    Args:
+        call_sid: The SID of the call to terminate.
+
+    Returns:
+        True if the call was successfully terminated, False otherwise.
     """
     if not self.client:
       logging.error(
@@ -145,7 +149,7 @@ class TwilioTelephonyService:
           call.status,
       )
       return True
-    except Exception as e:
+    except TwilioException as e:
       logging.warning(
           "SERVICE_WARNING: Failed to terminate call %s (it may have already"
           " ended): %s",
@@ -155,5 +159,5 @@ class TwilioTelephonyService:
       return False
 
 
-# Singleton instance to be used by other parts of the application
+# Singleton instance to be used by other parts of the application.
 telephony_service = TwilioTelephonyService()

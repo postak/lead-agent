@@ -1,6 +1,10 @@
 """Pydantic schemas for data validation and serialization."""
 
-from pydantic import BaseModel, Field, EmailStr
+import pydantic
+
+Field = pydantic.Field
+EmailStr = pydantic.EmailStr
+BaseModel = pydantic.BaseModel
 
 
 class LeadWebhookPayload(BaseModel):

@@ -19,7 +19,7 @@ RUN pip install certifi
 ENV PYTHONUNBUFFERED True
 ENV SSL_CERT_FILE=/usr/local/lib/python3.13/site-packages/certifi/cacert.pem
 
-WORKDIR /backend
+WORKDIR /src
 
 COPY requirements.txt .
 
@@ -30,4 +30,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,6 +1,7 @@
-# app/tools/record_qualification_data.py
+"""This module contains the business logic for the lead qualification process."""
+
 from absl import logging
-from app.services.crm_service import crm_service  # Using our mocked service
+from src.services.crm_service import crm_service  # Using our mocked service
 
 
 def build_lead_quality_record(
@@ -11,22 +12,22 @@ def build_lead_quality_record(
     needs: str,
     has_authority: bool,
     financing: bool,
-) -> dict:
+) -> dict[str, str]:
   """Saves the structured results of a lead qualification call to the CRM.
 
-  Use this after you have gathered all necessary information.
+  Args:
+      lead_id: The unique ID of the lead.
+      is_qualified: True if the lead is qualified for sales follow-up, False
+        otherwise.
+      summary: A brief summary of the conversation.
+      timeline: The lead's timeline for making a decision (e.g., "Next 3
+        months").
+      needs: A description of the lead's needs.
+      has_authority: True if the lead is a decision-maker.
+      financing: True if the lead has a confirmed budget.
 
-   Args:
-       lead_id: The unique ID of the lead.
-       is_qualified: True if the lead is qualified for sales follow-up, False otherwise.
-       summary: A brief summary of the conversation.
-       timeline: The lead's timeline for making a decision (e.g., "Next 3 months").
-       needs: A description of the lead's needs.
-       has_authority: True if the lead is a decision-maker.
-       financing: True if the lead has a confirmed budget.
-
-   Returns:
-       A dictionary confirming the status of the operation.
+  Returns:
+      A dictionary confirming the status of the operation.
   """
   logging.info("TOOL: Recording qualification data for lead_id: %s", lead_id)
   payload = {

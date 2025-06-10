@@ -1,17 +1,20 @@
-from absl import logging
+"""Helper functions for working with audio."""
 
 import audioop
 import base64
 import json
 
-ADK_TTS_OUTPUT_SAMPLE_RATE = 24000
-TWILIO_SAMPLE_RATE = 8000
+from absl import logging
+
+
+_ADK_TTS_OUTPUT_SAMPLE_RATE = 24000
+_TWILIO_SAMPLE_RATE = 8000
 
 
 def convert_pcm_audio_to_mulaw(
     pcm_audio_data_bytes: bytes,
-    pcm_sample_rate: int = ADK_TTS_OUTPUT_SAMPLE_RATE,
-    mulaw_sample_rate: int = TWILIO_SAMPLE_RATE,
+    pcm_sample_rate: int = _ADK_TTS_OUTPUT_SAMPLE_RATE,
+    mulaw_sample_rate: int = _TWILIO_SAMPLE_RATE,
 ) -> str:
   """Resamples, encodes, and base64-encodes audio.
 
@@ -35,7 +38,7 @@ def convert_pcm_audio_to_mulaw(
   return base64.b64encode(mulaw_audio).decode("utf-8")
 
 
-def decode_json_string(json_string: str) -> dict:
+def decode_json_string(json_string: str) -> dict[str, str]:
   """Decodes a base64-encoded JSON string to a dictionary.
 
   Args:

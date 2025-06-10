@@ -1,24 +1,22 @@
+"""Manages a single Twilio Media Stream WebSocket connection and conversation."""
+
 import asyncio
 import audioop
 import base64
 import json
-import fastapi
+from typing import Any, AsyncIterable
 
 from absl import logging
-from typing import AsyncIterable
-
-from app.handlers import utils
-from app.services.telephony_service import telephony_service
-from app.agents.agent import root_agent
-from app.services import telephony_service as telephony_service_lib
-from app.config import settings
-
+import fastapi
 from google.adk import agents
 from google.adk import runners
 from google.adk import sessions
 from google.adk.agents import run_config as run_config_lib
 from google.adk.events import event as event_lib
 from google.genai import types
+from src.config import settings
+from src.core import utils
+from src.services import telephony_service as telephony_service_lib
 
 
 InMemoryRunner = runners.InMemoryRunner
@@ -28,9 +26,6 @@ LiveRequestQueue = agents.LiveRequestQueue
 WebSocket = fastapi.WebSocket
 AgentSession = sessions.Session
 TelephonyService = telephony_service_lib.TwilioTelephonyService
-
-ADK_TTS_OUTPUT_SAMPLE_RATE = 24000
-TWILIO_EXPECTED_SAMPLE_RATE = 8000
 
 
 class TwilioAgentStream:
@@ -51,7 +46,7 @@ class TwilioAgentStream:
     self.initial_prompt_sent_to_agent = False
     self.terminate_call = False
 
-    self.lead_info: dict = {}
+    self.lead_info: dict[str, Any] = {}
     self.stream_sid: str = ""
     self.call_sid: str = ""
     self.agent_session: AgentSession | None = None
@@ -345,3 +340,5 @@ class TwilioAgentStream:
     finally:
       logging.info("WEBSOCKET: Closing session.")
       await self.websocket.close(code=1000, reason="Connection closed")
+      if self.agent_session:
+        await self.agent_session.close()
