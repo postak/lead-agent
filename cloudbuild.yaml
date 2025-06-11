@@ -7,7 +7,6 @@ steps:
         '-f', 'Dockerfile',
         '.'
     ]
-    dir: 'backend'
     waitFor: ['-']
 
 substitutions:
