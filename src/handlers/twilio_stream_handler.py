@@ -91,7 +91,7 @@ class TwilioAgentStream:
     speech_config = types.SpeechConfig(
         voice_config=types.VoiceConfig(
             # Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, and Zephyr
-            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Puck")
+            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Aoede")
         )
     )
     run_config = RunConfig(
@@ -116,7 +116,7 @@ class TwilioAgentStream:
         if tool_call.name == "conclude_call":
           self.terminate_call = True
 
-  async def handle_agent_to_twilio_stream(
+  async def agent_to_twilio_messaging(
       self,
   ) -> None:
     """Messages the agent's responses to Twilio."""
@@ -126,7 +126,7 @@ class TwilioAgentStream:
         self.call_sid,
     )
 
-    turn_counter: int = 1
+    turn_counter: int = 0
 
     try:
       while True:
@@ -145,13 +145,13 @@ class TwilioAgentStream:
                 await self.websocket.close(
                     code=1000, reason="Agent ended call via tool"
                 )
-                break
               except Exception as e:
                 logging.error(
                     "AGENT->TWILIO: Failed to terminate call %s: %s",
                     self.call_sid,
                     e,
                 )
+              break
 
             message = {
                 "event": "mark",
@@ -161,7 +161,6 @@ class TwilioAgentStream:
             await self.websocket.send_text(json.dumps(message))
             turn_counter += 1
             logging.info("AGENT->TWILIO: Turn %s complete.", turn_counter)
-            continue
 
           if event.interrupted:
             message = {
@@ -173,17 +172,12 @@ class TwilioAgentStream:
                 self.stream_sid,
             )
             await self.websocket.send_text(json.dumps(message))
-            continue
 
           part = (
               event.content and event.content.parts and event.content.parts[0]
           )
           if not part or event.author == "user":
             continue
-
-          part = (
-              event.content and event.content.parts and event.content.parts[0]
-          )
 
           is_audio = part.inline_data and part.inline_data.mime_type.startswith(
               "audio/pcm"
@@ -207,7 +201,7 @@ class TwilioAgentStream:
 
     except Exception as e:  # pylint: disable=broad-exception-caught
       logging.error(
-          "Error in handle_agent_to_twilio_stream for stream %s: %s."
+          "Error in agent_to_twilio_messaging for stream %s: %s."
           " Attempting to end call...",
           self.stream_sid,
           e,
@@ -220,9 +214,12 @@ class TwilioAgentStream:
     """Sends the initial prompt to the agent."""
     if not self.initial_prompt_sent_to_agent:
       initial_prompt = (
-          "The phone call has just been answered. Your goal is to qualify"
-          f" the lead. The lead's info is: {json.dumps(self.lead_info)}. Please"
-          " begin by introducing yourself."
+          "The phone call has just been answered. Your goal is to qualify the"
+          f" lead. The lead's info is: {json.dumps(self.lead_info)}. Please"
+          " begin by introducing yourself with your name and company and"
+          " confirm that you are speaking to"
+          f" {self.lead_info.get('first_name')} before asking further"
+          " questions."
       )
       content = types.Content(
           role="user", parts=[types.Part.from_text(text=initial_prompt)]
@@ -234,7 +231,7 @@ class TwilioAgentStream:
           self.call_sid,
       )
 
-  async def handle_twilio_to_agent_stream(
+  async def twilio_to_agent_messaging(
       self,
   ) -> None:
     """Listens for messages from Twilio and sends them to the agent."""
@@ -259,33 +256,26 @@ class TwilioAgentStream:
               event_type,
               self.call_sid,
           )
-          continue
 
         if event_type == "media":
-          decoded_audio = base64.b64decode(message["media"]["payload"])
-          pcm_audio = audioop.ulaw2lin(decoded_audio, 2)
-          self.live_request_queue.send_realtime(
-              types.Blob(data=pcm_audio, mime_type="audio/pcm")
+          pcm_audio = utils.convert_mulaw_audio_to_pcm(
+              message["media"]["payload"]
           )
-          logging.debug("TWILIO->AGENT: Sent user audio to live request queue.")
+          self.live_request_queue.send_realtime(
+              types.Blob(data=pcm_audio, mime_type=f"audio/pcm")
+          )
+          logging.info("TWILIO->AGENT: Sent user audio to live request queue.")
 
-        if event_type == "stop" or event_type == "closed":
+        if event_type == "stop":
           logging.info(
               "TWILIO->AGENT: Twilio stream stopped or client ended call."
           )
           self.live_request_queue.close()
           break
 
-        if event_type == "mark":
-          logging.debug(
-              "TWILIO->AGENT: Received Twilio mark: %s for CallSid %s.",
-              message.get("mark", {}).get("name"),
-              self.call_sid,
-          )
-          continue
     except Exception as e:  # pylint: disable=broad-exception-caught
       logging.error(
-          "TWILIO->AGENT: Error in handle_twilio_to_agent_stream for CallSid"
+          "TWILIO->AGENT: Error in twilio_to_agent_messaging for CallSid"
           " %s: %s",
           self.call_sid,
           e,
@@ -323,11 +313,11 @@ class TwilioAgentStream:
 
       await self.start_agent_session(session_id=self.stream_sid)
 
-      agent_task = asyncio.create_task(self.handle_agent_to_twilio_stream())
-      twilio_task = asyncio.create_task(self.handle_twilio_to_agent_stream())
+      agent_task = asyncio.create_task(self.agent_to_twilio_messaging())
+      twilio_task = asyncio.create_task(self.twilio_to_agent_messaging())
 
       await asyncio.wait(
-          [agent_task, twilio_task], return_when=asyncio.FIRST_EXCEPTION
+          [agent_task, twilio_task], return_when=asyncio.FIRST_COMPLETED
       )
     except Exception as e:  # pylint: disable=broad-exception-caught
       logging.exception(

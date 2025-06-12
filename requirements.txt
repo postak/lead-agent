@@ -14,3 +14,4 @@ websockets==15.0.1
 python-dotenv==1.1.0
 audioop-lts==0.2.1
 Deprecated==1.2.18
+pyink

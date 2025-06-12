@@ -4,7 +4,7 @@ from absl import logging
 from src.services.crm_service import crm_service  # Using our mocked service
 
 
-def build_lead_quality_record(
+async def build_lead_quality_record(
     lead_id: str,
     is_qualified: bool,
     summary: str,
@@ -31,6 +31,7 @@ def build_lead_quality_record(
   """
   logging.info("TOOL: Recording qualification data for lead_id: %s", lead_id)
   payload = {
+      "lead_id": lead_id,
       "is_qualified": is_qualified,
       "summary": summary,
       "timeline": timeline,
@@ -40,5 +41,5 @@ def build_lead_quality_record(
   }
   # In a real app, this would be an async call
   # await crm_service.update_lead_record(...)
-  crm_service.update_lead_record(lead_id, "Contacted - Qualified", payload)
+  await crm_service.update_lead_record(lead_id, "Contacted - Qualified", payload)
   return {"status": "success", "message": "Lead data recorded successfully."}

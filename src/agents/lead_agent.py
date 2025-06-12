@@ -7,7 +7,7 @@ from src.tools.lead_tools import build_lead_quality_record
 from src.tools.telephony_tools import conclude_call
 
 
-_MODEL = "gemini-2.0-flash-exp"  # "gemini-2.0-flash-live-001"
+_MODEL = "gemini-2.0-flash-live-001"  # "gemini-2.0-flash-live-001"
 
 
 def load_prompt_from_file() -> str:
