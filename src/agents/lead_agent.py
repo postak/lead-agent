@@ -1,11 +1,19 @@
 """Defines the ADK-native Agent for lead qualification."""
 
 import os
-from absl import logging
+import logging
 from google.adk import agents
-from src.tools.lead_tools import build_lead_quality_record
-from src.tools.telephony_tools import conclude_call
+from google.adk import memory
+from google.adk import sessions
+from src.tools import lead_tools
+from src.tools import telephony_tools
 
+InMemorySessionService = sessions.InMemorySessionService
+InMemoryMemoryService = memory.InMemoryMemoryService
+build_lead_quality_record = lead_tools.build_lead_quality_record
+conclude_call = telephony_tools.conclude_call
+session_service = InMemorySessionService()
+memory_service = InMemoryMemoryService()
 
 _MODEL = "gemini-2.0-flash-live-001"  # "gemini-2.0-flash-live-001"
 

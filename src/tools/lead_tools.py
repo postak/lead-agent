@@ -1,6 +1,6 @@
 """This module contains the business logic for the lead qualification process."""
 
-from absl import logging
+import logging
 from src.services.crm_service import crm_service  # Using our mocked service
 
 

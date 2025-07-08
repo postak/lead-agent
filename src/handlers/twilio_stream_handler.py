@@ -1,12 +1,11 @@
 """Manages a single Twilio Media Stream WebSocket connection and conversation."""
 
 import asyncio
-import audioop
-import base64
+from contextlib import suppress  # For ignoring CancelledError during cleanup
 import json
 from typing import Any, AsyncIterable
 
-from absl import logging
+import logging
 import fastapi
 from google.adk import agents
 from google.adk import runners
@@ -24,8 +23,22 @@ Event = event_lib.Event
 RunConfig = run_config_lib.RunConfig
 LiveRequestQueue = agents.LiveRequestQueue
 WebSocket = fastapi.WebSocket
+WebSocketDisconnect = fastapi.WebSocketDisconnect
 AgentSession = sessions.Session
 TelephonyService = telephony_service_lib.TwilioTelephonyService
+
+_SPEECH_CONFIG = types.SpeechConfig(
+    voice_config=types.VoiceConfig(
+        # Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, and Zephyr
+        prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Aoede")
+    )
+)
+
+_RUN_CONFIG = RunConfig(
+    response_modalities=["AUDIO"],
+    speech_config=_SPEECH_CONFIG,
+    # output_audio_transcription={},
+)
 
 
 class TwilioAgentStream:
@@ -88,26 +101,15 @@ class TwilioAgentStream:
       A tuple containing the live events stream and the request queue.
     """
     session = await self._get_managed_agent_session(session_id=session_id)
-    speech_config = types.SpeechConfig(
-        voice_config=types.VoiceConfig(
-            # Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, and Zephyr
-            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Aoede")
-        )
-    )
-    run_config = RunConfig(
-        response_modalities=["AUDIO"],
-        speech_config=speech_config,
-        # output_audio_transcription={},
-    )
     self.live_request_queue = LiveRequestQueue()
     self.live_events = self.agent_runner.run_live(
         session=session,
         live_request_queue=self.live_request_queue,
-        run_config=run_config,
+        run_config=_RUN_CONFIG,
     )
     logging.info("AGENT: Agent is running...")
 
-  async def _terminate_call_after_turn(self, event: Event) -> bool:
+  def _terminate_call_after_turn(self, event: Event) -> bool:
     """Check if the agent requested to terminate the call."""
     tool_calls = event.get_function_calls()
     if event.actions and tool_calls:
@@ -131,7 +133,7 @@ class TwilioAgentStream:
     try:
       while True:
         async for event in self.live_events:
-          await self._terminate_call_after_turn(event)
+          self._terminate_call_after_turn(event)
 
           if event.turn_complete:
             if self.terminate_call:
@@ -140,17 +142,10 @@ class TwilioAgentStream:
                   " (conclude_call).",
                   self.call_sid,
               )
-              try:
-                self.telephony_service.end_call(self.call_sid)
-                await self.websocket.close(
-                    code=1000, reason="Agent ended call via tool"
-                )
-              except Exception as e:
-                logging.error(
-                    "AGENT->TWILIO: Failed to terminate call %s: %s",
-                    self.call_sid,
-                    e,
-                )
+              await self.telephony_service.end_call(self.call_sid)
+              await self.websocket.close(
+                  code=1000, reason="Agent ended call via tool"
+              )
               break
 
             message = {
@@ -158,11 +153,11 @@ class TwilioAgentStream:
                 "streamSid": self.stream_sid,
                 "mark": {"name": f"turn_{turn_counter}_complete"},
             }
-            await self.websocket.send_text(json.dumps(message))
+            await self.websocket.send_json(message)
             turn_counter += 1
             logging.info("AGENT->TWILIO: Turn %s complete.", turn_counter)
 
-          if event.interrupted:
+          if hasattr(event, "interrupted") and event.interrupted:
             message = {
                 "event": "clear",
                 "streamSid": self.stream_sid,
@@ -171,7 +166,7 @@ class TwilioAgentStream:
                 "AGENT->TWILIO: Agent interrupted, clearing stream %s.",
                 self.stream_sid,
             )
-            await self.websocket.send_text(json.dumps(message))
+            await self.websocket.send_json(message)
 
           part = (
               event.content and event.content.parts and event.content.parts[0]
@@ -191,7 +186,7 @@ class TwilioAgentStream:
                 "streamSid": self.stream_sid,
                 "media": {"payload": mulaw_audio},
             }
-            await self.websocket.send_text(json.dumps(message))
+            await self.websocket.send_json(message)
             logging.debug(
                 "AGENT->TWILIO: Sent %d bytes of agent audio (8kHz μ-law) to"
                 " stream %s.",
@@ -200,15 +195,12 @@ class TwilioAgentStream:
             )
 
     except Exception as e:  # pylint: disable=broad-exception-caught
-      logging.error(
+      logging.exception(
           "Error in agent_to_twilio_messaging for stream %s: %s."
           " Attempting to end call...",
           self.stream_sid,
           e,
-          exc_info=True,
       )
-      self.telephony_service.end_call(self.call_sid)
-      await self.websocket.close(code=1011, reason="Agent processing error")
 
   def send_initial_prompt_to_agent(self):
     """Sends the initial prompt to the agent."""
@@ -245,8 +237,8 @@ class TwilioAgentStream:
       self.send_initial_prompt_to_agent()
 
       while True:
-        message_json = await self.websocket.receive_text()
-        message = json.loads(message_json)
+        has_seen_media = False
+        message = await self.websocket.receive_json()
         event_type = message.get("event")
 
         if event_type == "start" or event_type == "connected":
@@ -258,13 +250,17 @@ class TwilioAgentStream:
           )
 
         if event_type == "media":
-          pcm_audio = utils.convert_mulaw_audio_to_pcm(
-              message["media"]["payload"]
-          )
-          self.live_request_queue.send_realtime(
-              types.Blob(data=pcm_audio, mime_type=f"audio/pcm")
-          )
-          logging.info("TWILIO->AGENT: Sent user audio to live request queue.")
+          if not has_seen_media:
+            pcm_audio = utils.convert_mulaw_audio_to_pcm(
+                message["media"]["payload"]
+            )
+            self.live_request_queue.send_realtime(
+                types.Blob(data=pcm_audio, mime_type=f"audio/pcm")
+            )
+            logging.debug(
+                "TWILIO->AGENT: Sent user audio to live request queue."
+            )
+            has_seen_media = True
 
         if event_type == "stop":
           logging.info(
@@ -274,15 +270,12 @@ class TwilioAgentStream:
           break
 
     except Exception as e:  # pylint: disable=broad-exception-caught
-      logging.error(
+      logging.exception(
           "TWILIO->AGENT: Error in twilio_to_agent_messaging for CallSid"
           " %s: %s",
           self.call_sid,
           e,
-          exc_info=True,
       )
-      self.telephony_service.end_call(self.call_sid)
-      await self.websocket.close(code=1011, reason="Twilio processing error")
 
   async def manage_stream(self):
     """Main method that orchestrates the entire WebSocket session."""
@@ -316,19 +309,63 @@ class TwilioAgentStream:
       agent_task = asyncio.create_task(self.agent_to_twilio_messaging())
       twilio_task = asyncio.create_task(self.twilio_to_agent_messaging())
 
-      await asyncio.wait(
+      _, pending = await asyncio.wait(
           [agent_task, twilio_task], return_when=asyncio.FIRST_COMPLETED
+      )
+      for task in pending:
+        if not task.done():
+          logging.debug(
+              "WEBSOCKET: [%s] Cancelling pending bridge task...",
+              self.stream_sid,
+          )
+          task.cancel()
+          with suppress(asyncio.CancelledError):
+            await task
+    except WebSocketDisconnect:
+      logging.info(
+          "WEBSOCKET: [%s] Client WebSocket disconnected"
+          " (detected in listener).",
+          self.stream_sid,
+      )
+      if self.live_request_queue:
+        self.live_request_queue.close()
+    except asyncio.CancelledError:
+      logging.info(
+          "WEBSOCKET: Endpoint task cancelled for session: %s", self.stream_sid
       )
     except Exception as e:  # pylint: disable=broad-exception-caught
       logging.exception(
-          "WEBSOCKET: Connection error for CallSid %s: %s",
-          self.call_sid,
+          "WEBSOCKET: Unhandled exception in session %s: %s",
+          self.stream_sid,
           e,
       )
-      if self.call_sid:
-        self.telephony_service.end_call(self.call_sid)
+      with suppress(Exception):
+        if self.call_sid:
+          await self.telephony_service.end_call(self.call_sid)
+        await self.websocket.close(
+            code=1011, reason=f"Internal Server Error: {type(e).__name__}"
+        )
     finally:
-      logging.info("WEBSOCKET: Closing session.")
-      await self.websocket.close(code=1000, reason="Connection closed")
+      logging.info("WEBSOCKET: Final cleanup for session: %s", self.stream_sid)
+      if self.live_request_queue:
+        logging.debug(
+            f"WEBSOCKET: [%s] Closing live request queue in final cleanup.",
+            self.stream_sid,
+        )
+        try:
+          self.live_request_queue.close()
+        except Exception as q_close_err:
+          logging.warning(
+              "WEBSOCKET: [%s] Error closing LiveRequestQueue: %s",
+              self.stream_sid,
+              q_close_err,
+          )
+      if agent_task and not agent_task.done():
+        agent_task.cancel()
+      if twilio_task and not twilio_task.done():
+        twilio_task.cancel()
       if self.agent_session:
         await self.agent_session.close()
+      if self.call_sid:
+        await self.telephony_service.end_call(self.call_sid)
+      await self.websocket.close(code=1000, reason="Connection closed")

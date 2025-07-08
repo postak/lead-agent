@@ -1,6 +1,6 @@
 """FastAPI router for handling call-related API endpoints."""
 
-from absl import logging
+import logging
 import fastapi
 from src.schemas import lead as lead_lib
 from src.services import telephony_service as telephony_service_lib
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api", tags=["Calls"])  # Or adjust as needed
 async def initiate_call_endpoint(payload: LeadWebhookPayload) -> Response:
   """HTTP Webhook to receive a lead and command Twilio to make a call."""
   logging.info("INITIATE_CALL: Received lead for %s", payload.lead_id)
-  call_sid = telephony_service.initiate_call_with_stream(
+  call_sid = await telephony_service.initiate_call_with_stream(
       lead_info=payload.model_dump(),
   )
   if call_sid:

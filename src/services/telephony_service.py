@@ -2,8 +2,9 @@
 
 import base64
 import json
+import aiohttp
 
-from absl import logging
+import logging
 from src.config import settings
 from twilio import rest
 from twilio.base.exceptions import TwilioException
@@ -23,18 +24,14 @@ class TwilioTelephonyService:
   """
 
   def __init__(self):
-    try:
-      self.client = Client(
-          settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN
-      )
-      logging.info("SERVICE: Twilio client initialized successfully.")
-    except TwilioException as e:
-      self.client = None
-      logging.critical(
-          "SERVICE_ERROR: Failed to initialize Twilio client: %s", e
-      )
+    self.auth = aiohttp.BasicAuth(
+        login=settings.TWILIO_ACCOUNT_SID, password=settings.TWILIO_AUTH_TOKEN
+    )
+    logging.info("SERVICE: Twilio client initialized successfully.")
 
-  def initiate_call_with_stream(self, lead_info: dict[str, str]) -> str | None:
+  async def initiate_call_with_stream(
+      self, lead_info: dict[str, str]
+  ) -> str | None:
     """Initiates an outbound call using Twilio.
 
     Instructs Twilio to connect a bidirectional media stream
@@ -46,12 +43,6 @@ class TwilioTelephonyService:
     Returns:
         The Call SID if the call was successfully initiated, None otherwise.
     """
-    if not self.client:
-      logging.error(
-          "SERVICE_ERROR: Cannot initiate call, Twilio client not available."
-      )
-      return None
-
     phone_number = lead_info.get("phone_number")
     lead_id = lead_info.get("lead_id")
     if not phone_number or not lead_id:
@@ -90,29 +81,32 @@ class TwilioTelephonyService:
           lead_id,
       )
 
-      call = self.client.calls.create(
-          to=phone_number,
-          from_=settings.TWILIO_VIRTUAL_PHONE_NUMBER,
-          twiml=twiml_response.to_xml(),
-          status_callback=status_callback_url,
-          status_callback_method="POST",
-          status_callback_event=[
-              "initiated",
-              "ringing",
-              "answered",
-              "completed",
-              "failed",
-              "busy",
-              "no-answer",
-          ],
-      )
-
-      logging.info(
-          "SERVICE: Twilio call initiated. Call SID: %s and twiml %s",
-          call.sid,
-          twiml_response.to_xml(),
-      )
-      return call.sid
+      async with aiohttp.ClientSession(auth=self.auth) as session:
+        response = await session.post(
+            f"https://api.twilio.com/2010-04-01/Accounts/{settings.TWILIO_ACCOUNT_SID}/Calls.json",
+            data={
+                "From": settings.TWILIO_VIRTUAL_PHONE_NUMBER,
+                "To": phone_number,
+                "StatusCallback": status_callback_url,
+                "StatusCallbackMethod": "POST",
+                "StatusCallbackEvent": [
+                    "initiated",
+                    "answered",
+                    "completed",
+                ],
+                "Twiml": twiml_response.to_xml(),
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        call = await response.json()
+        call_sid = call.get("sid")
+        logging.info(
+            "SERVICE: Twilio call initiated. Call SID: %s and twiml %s. Full call response %s",
+            call_sid,
+            twiml_response.to_xml(),
+            call,
+        )
+        return call_sid
 
     except TwilioException as e:
       logging.error(
@@ -122,8 +116,12 @@ class TwilioTelephonyService:
           e,
       )
       return None
+    
+    except Exception as e:
+      logging.exception(e)
+      raise e
 
-  def end_call(self, call_sid: str) -> bool:
+  async def end_call(self, call_sid: str) -> bool:
     """Terminates an active call using the Twilio REST API.
 
     Args:
@@ -132,21 +130,24 @@ class TwilioTelephonyService:
     Returns:
         True if the call was successfully terminated, False otherwise.
     """
-    if not self.client:
-      logging.error(
-          "SERVICE_ERROR: Cannot end call %s, Twilio client not available.",
-          call_sid,
-      )
-      return False
     try:
       logging.info(
           "SERVICE: Requesting to terminate call SID %s via REST API.", call_sid
       )
-      call = self.client.calls(call_sid).update(status="completed")
+      async with aiohttp.ClientSession(auth=self.auth) as session:
+        response = await session.post(
+            f"https://api.twilio.com/2010-04-01/Accounts/{settings.TWILIO_ACCOUNT_SID}/Calls/{call_sid}.json",
+            data={
+                "Status": "completed",
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        call = await response.json()
+
       logging.info(
           "SERVICE: Call %s status updated to '%s' via API.",
           call_sid,
-          call.status,
+          call.get("status"),
       )
       return True
     except TwilioException as e:

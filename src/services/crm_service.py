@@ -4,9 +4,7 @@ In a real application, this would use the HubSpot/Salesforce client
 to fetch and update contact/lead data.
 """
 import asyncio
-import time
-
-from absl import logging
+import logging
 
 
 class MockCRMService:
