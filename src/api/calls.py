@@ -29,12 +29,12 @@ async def initiate_call_endpoint(payload: LeadWebhookPayload) -> Response:
 
 @router.post("/twilio_status_handler")
 async def handle_twilio_call_status(
-    call_sid: str = Form(...),
-    call_status: str = Form(...),
-    from_: str = Form(None),
-    to: str = Form(None),
-    call_duration: str = Form(None),
-    sip_response_code: str = Form(None),
+    call_sid: str = Form(..., alias="CallSid"),
+    call_status: str = Form(..., alias="CallStatus"),
+    from_: str = Form(None, alias="From"),
+    to: str = Form(None, alias="To"),
+    call_duration: str = Form(None, alias="CallDuration"),
+    sip_response_code: str = Form(None, alias="SipResponseCode"),
 ):
   """Receives call status updates from Twilio."""
   try:

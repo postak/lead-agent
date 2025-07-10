@@ -5,6 +5,7 @@ from contextlib import suppress  # For ignoring CancelledError during cleanup
 import json
 from typing import Any, AsyncIterable
 
+import base64
 import logging
 import fastapi
 from google.adk import agents
@@ -21,6 +22,7 @@ from src.services import telephony_service as telephony_service_lib
 InMemoryRunner = runners.InMemoryRunner
 Event = event_lib.Event
 RunConfig = run_config_lib.RunConfig
+StreamingMode = run_config_lib.StreamingMode
 LiveRequestQueue = agents.LiveRequestQueue
 WebSocket = fastapi.WebSocket
 WebSocketDisconnect = fastapi.WebSocketDisconnect
@@ -35,9 +37,19 @@ _SPEECH_CONFIG = types.SpeechConfig(
 )
 
 _RUN_CONFIG = RunConfig(
+    streaming_mode=StreamingMode.BIDI,
     response_modalities=["AUDIO"],
     speech_config=_SPEECH_CONFIG,
-    # output_audio_transcription={},
+    realtime_input_config=types.RealtimeInputConfig(
+      automatic_activity_detection=types.AutomaticActivityDetection(
+          disabled=False,
+          start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
+          end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
+          prefix_padding_ms=20,
+          silence_duration_ms=100,
+      )),
+    output_audio_transcription=types.AudioTranscriptionConfig(),
+    input_audio_transcription=types.AudioTranscriptionConfig(),
 )
 
 
@@ -134,7 +146,6 @@ class TwilioAgentStream:
       while True:
         async for event in self.live_events:
           self._terminate_call_after_turn(event)
-
           if event.turn_complete:
             if self.terminate_call:
               logging.info(
@@ -172,7 +183,7 @@ class TwilioAgentStream:
               event.content and event.content.parts and event.content.parts[0]
           )
           if not part or event.author == "user":
-            continue
+            continue            
 
           is_audio = part.inline_data and part.inline_data.mime_type.startswith(
               "audio/pcm"
@@ -208,10 +219,7 @@ class TwilioAgentStream:
       initial_prompt = (
           "The phone call has just been answered. Your goal is to qualify the"
           f" lead. The lead's info is: {json.dumps(self.lead_info)}. Please"
-          " begin by introducing yourself with your name and company and"
-          " confirm that you are speaking to"
-          f" {self.lead_info.get('first_name')} before asking further"
-          " questions."
+          f" begin by confirming that you are speaking to {self.lead_info.get('first_name')}."
       )
       content = types.Content(
           role="user", parts=[types.Part.from_text(text=initial_prompt)]
@@ -235,10 +243,11 @@ class TwilioAgentStream:
     )
     try:
       self.send_initial_prompt_to_agent()
-
       while True:
-        has_seen_media = False
         message = await self.websocket.receive_json()
+        if not message:
+          logging.info("TWILIO->AGENT: Received empty message.")
+          continue
         event_type = message.get("event")
 
         if event_type == "start" or event_type == "connected":
@@ -250,25 +259,20 @@ class TwilioAgentStream:
           )
 
         if event_type == "media":
-          if not has_seen_media:
-            pcm_audio = utils.convert_mulaw_audio_to_pcm(
-                message["media"]["payload"]
-            )
-            self.live_request_queue.send_realtime(
-                types.Blob(data=pcm_audio, mime_type=f"audio/pcm")
-            )
-            logging.debug(
-                "TWILIO->AGENT: Sent user audio to live request queue."
-            )
-            has_seen_media = True
+          payload =  message["media"]["payload"]
+          pcm_audio = utils.convert_mulaw_audio_to_pcm(
+              payload
+          )
+          self.live_request_queue.send_realtime(
+              types.Blob(data=pcm_audio, mime_type="audio/pcm;rate=24000")
+          )
 
-        if event_type == "stop":
+        if event_type in ("stop",  "closed"):
           logging.info(
               "TWILIO->AGENT: Twilio stream stopped or client ended call."
           )
           self.live_request_queue.close()
           break
-
     except Exception as e:  # pylint: disable=broad-exception-caught
       logging.exception(
           "TWILIO->AGENT: Error in twilio_to_agent_messaging for CallSid"
@@ -278,7 +282,7 @@ class TwilioAgentStream:
       )
 
   async def manage_stream(self):
-    """Main method that orchestrates the entire WebSocket session."""
+    """Main method that manages WebSocket session."""
     try:
       while True:
         initial_message_json = await self.websocket.receive_text()
@@ -304,7 +308,7 @@ class TwilioAgentStream:
         )
         return
 
-      await self.start_agent_session(session_id=self.stream_sid)
+      await self.start_agent_session(session_id=self.call_sid)
 
       agent_task = asyncio.create_task(self.agent_to_twilio_messaging())
       twilio_task = asyncio.create_task(self.twilio_to_agent_messaging())

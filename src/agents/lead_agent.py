@@ -15,7 +15,7 @@ conclude_call = telephony_tools.conclude_call
 session_service = InMemorySessionService()
 memory_service = InMemoryMemoryService()
 
-_MODEL = "gemini-2.0-flash-live-001"  # "gemini-2.0-flash-live-001"
+_MODEL = "gemini-live-2.5-flash-preview"  # "gemini-2.0-flash-live-001"
 
 
 def load_prompt_from_file() -> str:

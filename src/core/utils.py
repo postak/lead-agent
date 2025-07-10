@@ -3,8 +3,7 @@
 import audioop
 import base64
 import json
-
-from absl import logging
+import logging
 
 
 ADK_TTS_OUTPUT_SAMPLE_RATE = 24000
@@ -71,4 +70,13 @@ def convert_mulaw_audio_to_pcm(mulaw_audio_payload: str) -> bytes:
     The PCM audio data.
   """
   decoded_audio = base64.b64decode(mulaw_audio_payload)
-  return audioop.ulaw2lin(decoded_audio, 2)
+  pcm_16bit_8khz_frames = audioop.ulaw2lin(decoded_audio, 2)
+  pcm_16bit_24khz_frames, _ = audioop.ratecv(
+        pcm_16bit_8khz_frames, # Audio data
+        2,                     # Sample width in bytes (16-bit)
+        1,                     # Number of channels (mono)
+        TWILIO_SAMPLE_RATE,                  # Input frame rate
+        ADK_TTS_OUTPUT_SAMPLE_RATE,                 # Output frame rate
+        None                   # No previous state
+    )
+  return pcm_16bit_24khz_frames
