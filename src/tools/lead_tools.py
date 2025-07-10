@@ -1,7 +1,7 @@
 """This module contains the business logic for the lead qualification process."""
 
 import logging
-from src.services.crm_service import crm_service  # Using our mocked service
+from src.services.crm_service import crm_service  # Using a mocked service
 
 
 async def build_lead_quality_record(
@@ -39,7 +39,5 @@ async def build_lead_quality_record(
       "has_authority": has_authority,
       "financing": financing,
   }
-  # In a real app, this would be an async call
-  # await crm_service.update_lead_record(...)
   await crm_service.update_lead_record(lead_id, "Contacted - Qualified", payload)
   return {"status": "success", "message": "Lead data recorded successfully."}

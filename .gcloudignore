@@ -87,5 +87,8 @@ terraform-common/
 *.tfstate.*
 crash.log
 
+# Git stuff
+.git
+
 # Ignore the plan output of the current working directory
 terraform.tfplan
