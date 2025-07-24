@@ -22,7 +22,7 @@ class Settings(BaseSettings):
   TWILIO_AUTH_TOKEN: str
   TWILIO_VIRTUAL_PHONE_NUMBER: str
 
-  BASE_URL: str = 'https://twilio-agent-682040119888.us-central1.run.app'
+  BASE_URL: str
 
 
 settings = Settings()

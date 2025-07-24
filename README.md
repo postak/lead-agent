@@ -200,7 +200,7 @@ When deploying, ensure you:
 1.  Build a Docker container from the provided `Dockerfile`.
 2.  Push the container image to a registry like Google Artifact Registry.
 3.  Deploy the image as a Cloud Run service.
-4.  Configure all necessary **environment variables** (as listed in `.env.example`) in the Cloud Run service settings. Remember to set `BASE_URL` to the service's own public URL.
+4.  Configure all necessary **environment variables** (as listed in `.env.example`) in the Cloud Run service settings. Remember to set `BASE_URL` to the service's own public URL - this typically will follow this pattern `https://twilio-agent-<PROJECT_NUMBER>.<REGION>.run.app`.
 5.  Enable **Session Affinity** in the "Networking" tab of your Cloud Run service configuration. This is crucial for WebSocket stability.
 6.  Ensure the service is configured to **"Allow unauthenticated invocations"** so that Twilio's webhooks can reach it.
 
