@@ -7,11 +7,32 @@ steps:
         '-f', 'Dockerfile',
         '.'
     ]
-    waitFor: ['-']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-image'
+    waitFor: ['build-backend']
+    args: ['push', '$_ARTIFACT_REGISTRY_REGION-docker.pkg.dev/$PROJECT_ID/$_ARTIFACT_REGISTRY_REPO/twilio_agent:latest']
+
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'deploy-to-cloud-run'
+    waitFor: ['push-image']
+    args: [
+        'run', 'deploy', 'twilio-agent',
+        '--image', '$_ARTIFACT_REGISTRY_REGION-docker.pkg.dev/$PROJECT_ID/$_ARTIFACT_REGISTRY_REPO/twilio_agent:latest',
+        '--region', '$_ARTIFACT_REGISTRY_REGION',
+        '--platform', 'managed',
+        '--memory', '2G',
+        '--session-affinity',
+        '--port', '8000',
+        '--allow-unauthenticated', 
+        '--quiet' 
+    ]
+
 
 substitutions:
   _ARTIFACT_REGISTRY_REGION: 'us-central1'
-  _ARTIFACT_REGISTRY_REPO: 'lead-agent'
+  _ARTIFACT_REGISTRY_REPO: 'my-repo-us'
 
-images:
-  - '$_ARTIFACT_REGISTRY_REGION-docker.pkg.dev/$PROJECT_ID/$_ARTIFACT_REGISTRY_REPO/twilio_agent:latest'
+# images:
+#   - '$_ARTIFACT_REGISTRY_REGION-docker.pkg.dev/$PROJECT_ID/$_ARTIFACT_REGISTRY_REPO/twilio_agent:latest'

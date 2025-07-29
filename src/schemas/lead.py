@@ -22,7 +22,11 @@ class LeadWebhookPayload(BaseModel):
   phone_number: str = Field(
       ..., description="The phone number to call for qualification."
   )
+  call_language: str = Field(
+      "en-US", description="The language of the call."
+  )
   email: EmailStr = Field(..., description="The lead's email address.")
+
   product_interest: str | None = Field(
       None, description="The product or service the lead is interested in."
   )

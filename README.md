@@ -204,6 +204,11 @@ When deploying, ensure you:
 5.  Enable **Session Affinity** in the "Networking" tab of your Cloud Run service configuration. This is crucial for WebSocket stability.
 6.  Ensure the service is configured to **"Allow unauthenticated invocations"** so that Twilio's webhooks can reach it.
 
+Command to execute the above steps:
+```
+    gcloud builds submit --config=cloudbuild.yaml .
+```
+
 ## 🤝 Contributing
 
 Contributions are welcome\! Please feel free to submit a pull request or open an issue for bugs, feature requests, or improvements.
