@@ -160,6 +160,7 @@ curl -X POST \
          "last_name": "Doe",
          "phone_number": "+15558675309",
          "email": "john.doe@example.com",
+         "call_language" : "en-US",
          "product_interest": "Real-Time AI Agents"
      }' \
      https://your-public-url.com/api/calls/initiate
@@ -198,7 +199,7 @@ This application is container-ready and well-suited for deployment on serverless
 When deploying, ensure you:
 
 1.  Build a Docker container from the provided `Dockerfile`.
-2.  Push the container image to a registry like Google Artifact Registry.
+2.  Push the container image to a registry like Google Artifact Registry. Default name is *lead-agent*
 3.  Deploy the image as a Cloud Run service.
 4.  Configure all necessary **environment variables** (as listed in `.env.example`) in the Cloud Run service settings. Remember to set `BASE_URL` to the service's own public URL - this typically will follow this pattern `https://twilio-agent-<PROJECT_NUMBER>.<REGION>.run.app`.
 5.  Enable **Session Affinity** in the "Networking" tab of your Cloud Run service configuration. This is crucial for WebSocket stability.

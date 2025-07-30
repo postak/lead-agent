@@ -25,8 +25,9 @@ class LeadWebhookPayload(BaseModel):
   call_language: str = Field(
       "en-US", description="The language of the call."
   )
-  email: EmailStr = Field(..., description="The lead's email address.")
-
+  email: EmailStr = Field(
+    ..., description="The lead's email address."
+  )
   product_interest: str | None = Field(
       None, description="The product or service the lead is interested in."
   )

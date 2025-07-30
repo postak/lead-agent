@@ -75,12 +75,12 @@ class TwilioAgentStream:
         user_id=session_id,
     )
 
-  def _set_run_config(self):
+  def _get_run_config(self):
 
     voice_language_code = self.lead_info.get('call_language')
-    logging.info (f"\n\nLUCA1 =======================================> {voice_language_code}\n\n")
+    logging.info (f"voice_language_code : {voice_language_code}\n\n")
 
-    _SPEECH_CONFIG = types.SpeechConfig(
+    speech_config = types.SpeechConfig(
       voice_config=types.VoiceConfig(
           prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=settings.VOICE_NAME)
       ),
@@ -90,7 +90,7 @@ class TwilioAgentStream:
     return RunConfig(
         streaming_mode=StreamingMode.BIDI,
         response_modalities=["AUDIO"],
-        speech_config=_SPEECH_CONFIG,
+        speech_config=speech_config,
         realtime_input_config=types.RealtimeInputConfig(
           automatic_activity_detection=types.AutomaticActivityDetection(
               disabled=False,
@@ -116,13 +116,13 @@ class TwilioAgentStream:
       A tuple containing the live events stream and the request queue.
     """
 
-    _RUN_CONFIG = self._set_run_config()
+    run_config = self._get_run_config()
     session = await self._get_managed_agent_session(session_id=session_id)
     self.live_request_queue = LiveRequestQueue()
     self.live_events = self.agent_runner.run_live(
         session=session,
         live_request_queue=self.live_request_queue,
-        run_config=_RUN_CONFIG,
+        run_config=run_config,
     )
     logging.info("AGENT: Agent is running...")
 
@@ -224,8 +224,8 @@ class TwilioAgentStream:
       initial_prompt = (
           "The phone call has just been answered. Your goal is to qualify the"
           f" lead. The lead's info is: {json.dumps(self.lead_info)}. Please"
-          f" begin by confirming that you are speaking to {self.lead_info.get('first_name')}"
-          f" using as initial speaking language {self.lead_info.get('call_language')}"
+          f" begin by confirming that you are speaking to {self.lead_info.get('first_name')}."
+          f" You MUST conduct the call in the language corresponding to language code '{self.lead_info.get('call_language')}."
       )
       content = types.Content(
           role="user", parts=[types.Part.from_text(text=initial_prompt)]
