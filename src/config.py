@@ -24,5 +24,6 @@ class Settings(BaseSettings):
 
   BASE_URL: str
 
-
+  VOICE_NAME: str 
+  
 settings = Settings()

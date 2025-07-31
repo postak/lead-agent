@@ -18,7 +18,6 @@ from src.config import settings
 from src.core import utils
 from src.services import telephony_service as telephony_service_lib
 
-
 InMemoryRunner = runners.InMemoryRunner
 Event = event_lib.Event
 RunConfig = run_config_lib.RunConfig
@@ -28,30 +27,6 @@ WebSocket = fastapi.WebSocket
 WebSocketDisconnect = fastapi.WebSocketDisconnect
 AgentSession = sessions.Session
 TelephonyService = telephony_service_lib.TwilioTelephonyService
-
-_SPEECH_CONFIG = types.SpeechConfig(
-    voice_config=types.VoiceConfig(
-        # Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, and Zephyr
-        prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Aoede")
-    )
-)
-
-_RUN_CONFIG = RunConfig(
-    streaming_mode=StreamingMode.BIDI,
-    response_modalities=["AUDIO"],
-    speech_config=_SPEECH_CONFIG,
-    realtime_input_config=types.RealtimeInputConfig(
-      automatic_activity_detection=types.AutomaticActivityDetection(
-          disabled=False,
-          start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
-          end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
-          prefix_padding_ms=20,
-          silence_duration_ms=100,
-      )),
-    output_audio_transcription=types.AudioTranscriptionConfig(),
-    input_audio_transcription=types.AudioTranscriptionConfig(),
-)
-
 
 class TwilioAgentStream:
   """Manages a single Twilio Media Stream WebSocket connection and conversation."""
@@ -100,6 +75,35 @@ class TwilioAgentStream:
         user_id=session_id,
     )
 
+  def _get_run_config(self):
+
+    voice_language_code = self.lead_info.get('call_language_code')
+    logging.info("AGENT: voice_language_code: '%s'", voice_language_code)
+
+
+    speech_config = types.SpeechConfig(
+      voice_config=types.VoiceConfig(
+          prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=settings.VOICE_NAME)
+      ),
+      language_code=voice_language_code
+    )
+
+    return RunConfig(
+        streaming_mode=StreamingMode.BIDI,
+        response_modalities=["AUDIO"],
+        speech_config=speech_config,
+        realtime_input_config=types.RealtimeInputConfig(
+          automatic_activity_detection=types.AutomaticActivityDetection(
+              disabled=False,
+              start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
+              end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
+              prefix_padding_ms=20,
+              silence_duration_ms=100,
+          )),
+        output_audio_transcription=types.AudioTranscriptionConfig(),
+        input_audio_transcription=types.AudioTranscriptionConfig(),
+    )
+
   async def start_agent_session(
       self,
       session_id: str,
@@ -112,12 +116,14 @@ class TwilioAgentStream:
     Returns:
       A tuple containing the live events stream and the request queue.
     """
+
+    run_config = self._get_run_config()
     session = await self._get_managed_agent_session(session_id=session_id)
     self.live_request_queue = LiveRequestQueue()
     self.live_events = self.agent_runner.run_live(
         session=session,
         live_request_queue=self.live_request_queue,
-        run_config=_RUN_CONFIG,
+        run_config=run_config,
     )
     logging.info("AGENT: Agent is running...")
 
@@ -220,6 +226,7 @@ class TwilioAgentStream:
           "The phone call has just been answered. Your goal is to qualify the"
           f" lead. The lead's info is: {json.dumps(self.lead_info)}. Please"
           f" begin by confirming that you are speaking to {self.lead_info.get('first_name')}."
+          f" You MUST conduct the call in the language corresponding to language code '{self.lead_info.get('call_language_code')}."
       )
       content = types.Content(
           role="user", parts=[types.Part.from_text(text=initial_prompt)]
