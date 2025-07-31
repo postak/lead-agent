@@ -160,7 +160,7 @@ curl -X POST \
          "last_name": "Doe",
          "phone_number": "+15558675309",
          "email": "john.doe@example.com",
-         "call_language" : "en-US",
+         "call_language_code" : "en-US",
          "product_interest": "Real-Time AI Agents"
      }' \
      https://your-public-url.com/api/calls/initiate

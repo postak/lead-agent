@@ -77,8 +77,9 @@ class TwilioAgentStream:
 
   def _get_run_config(self):
 
-    voice_language_code = self.lead_info.get('call_language')
-    logging.info (f"voice_language_code : {voice_language_code}\n\n")
+    voice_language_code = self.lead_info.get('call_language_code')
+    logging.info("AGENT: voice_language_code: '%s'", voice_language_code)
+
 
     speech_config = types.SpeechConfig(
       voice_config=types.VoiceConfig(
@@ -225,7 +226,7 @@ class TwilioAgentStream:
           "The phone call has just been answered. Your goal is to qualify the"
           f" lead. The lead's info is: {json.dumps(self.lead_info)}. Please"
           f" begin by confirming that you are speaking to {self.lead_info.get('first_name')}."
-          f" You MUST conduct the call in the language corresponding to language code '{self.lead_info.get('call_language')}."
+          f" You MUST conduct the call in the language corresponding to language code '{self.lead_info.get('call_language_code')}."
       )
       content = types.Content(
           role="user", parts=[types.Part.from_text(text=initial_prompt)]
